@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>3D Mannequin</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@200;300;400;500&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+body,html{width:100%;height:100%;overflow:hidden;background:transparent;font-family:'Outfit',sans-serif}
+#sc{width:100%;height:100%;position:relative;cursor:grab;background:transparent}
+#sc:active{cursor:grabbing}
+canvas{display:block;width:100%;height:100%}
+.ml{position:absolute;pointer-events:none;z-index:5;display:flex;align-items:center;gap:6px;opacity:0;transition:opacity .3s ease;font-family:'Outfit',sans-serif}
+.ml.visible{opacity:1}
+.mv{background:rgba(255,255,255,.12);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.25);border-radius:20px;padding:6px 14px;font-size:13px;font-weight:300;letter-spacing:.8px;color:#1a1a2e;white-space:nowrap;box-shadow:0 4px 20px rgba(0,0,0,.06)}
+.mn{font-size:10px;font-weight:500;text-transform:uppercase;letter-spacing:2px;color:rgba(26,26,46,.5);white-space:nowrap}
+.di{width:6px;height:6px;border-radius:50%;background:rgba(26,26,46,.3);border:1.5px solid rgba(26,26,46,.15);flex-shrink:0}
+</style>
+</head>
+<body>
+<div id="sc">
+<canvas id="cv"></canvas>
+<div class="ml visible" id="la"><div class="di"></div><div><div class="mv">32.5"</div><div class="mn">Right Arm</div></div></div>
+<div class="ml visible" id="lc"><div class="di"></div><div><div class="mv">40"</div><div class="mn">Chest</div></div></div>
+<div class="ml visible" id="lw"><div class="di"></div><div><div class="mv">34"</div><div class="mn">Waist</div></div></div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/GLTFLoader.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128/examples/js/loaders/DRACOLoader.js"></script>
+<script>
+(function(){
+var ct=document.getElementById('sc'),cv=document.getElementById('cv');
+var scene=new THREE.Scene();
+var cam=new THREE.PerspectiveCamera(40,ct.clientWidth/ct.clientHeight,.1,100);
+cam.position.set(0,.3,4.5);
+var ren=new THREE.WebGLRenderer({canvas:cv,antialias:true,alpha:true});
+ren.setClearColor(0x000000,0);
+ren.setSize(ct.clientWidth,ct.clientHeight);
+ren.setPixelRatio(Math.min(devicePixelRatio,2));
+ren.shadowMap.enabled=true;
+ren.shadowMap.type=THREE.PCFSoftShadowMap;
+ren.toneMapping=THREE.ACESFilmicToneMapping;
+ren.toneMappingExposure=1.1;
+
+scene.add(new THREE.AmbientLight(0xdde1e8,.6));
+var kl=new THREE.DirectionalLight(0xffffff,.9);kl.position.set(3,5,4);kl.castShadow=true;scene.add(kl);
+var fl=new THREE.DirectionalLight(0xc8d0e0,.4);fl.position.set(-3,2,-2);scene.add(fl);
+var rl=new THREE.DirectionalLight(0xe8ecf2,.5);rl.position.set(0,3,-4);scene.add(rl);
+
+var M=new THREE.Group();M.position.y=-.15;scene.add(M);
+
+// Draco decoder setup
+var draco=new THREE.DRACOLoader();
+draco.setDecoderPath('https://www.gstatic.com/draco/versioned/decoders/1.5.6/');
+draco.setDecoderConfig({type:'js'});
+
+// GLTF loader with Draco
+var gltf=new THREE.GLTFLoader();
+gltf.setDRACOLoader(draco);
+
+gltf.load('mannequin.glb',function(g){
+var mdl=g.scene;
+var box=new THREE.Box3().setFromObject(mdl);
+var sz=box.getSize(new THREE.Vector3());
+var sc=2.0/sz.y;
+mdl.scale.setScalar(sc);
+box.setFromObject(mdl);
+var c=box.getCenter(new THREE.Vector3());
+mdl.position.x=-c.x;mdl.position.z=-c.z;
+mdl.position.y=-box.min.y-.85;
+var gm=new THREE.MeshStandardMaterial({color:0xc8ccd4,roughness:.55,metalness:.05});
+mdl.traverse(function(ch){if(ch.isMesh){ch.material=gm;ch.castShadow=true;ch.receiveShadow=true;}});
+M.add(mdl);
+},undefined,function(e){
+var d=document.createElement('div');
+d.style.cssText='position:fixed;top:10px;left:10px;background:red;color:white;padding:10px;z-index:999;font-size:14px;max-width:90%;word-break:break-all';
+d.textContent='Error: '+(e.message||JSON.stringify(e));
+document.body.appendChild(d);
+});
+
+function dR(r,y,col){var p=[];for(var i=0;i<=128;i++){var a=(i/128)*Math.PI*2;p.push(new THREE.Vector3(Math.cos(a)*r,y,Math.sin(a)*r));}var g=new THREE.BufferGeometry().setFromPoints(p);var m=new THREE.LineDashedMaterial({color:col||0x3a3a5c,transparent:true,opacity:.3,dashSize:.03,gapSize:.02});var l=new THREE.Line(g,m);l.computeLineDistances();return l;}
+M.add(dR(.24,.78,0x2a2a4a));M.add(dR(.18,.4,0x2a2a4a));
+var ap=[new THREE.Vector3(.3,.85,0),new THREE.Vector3(.355,.02,0)];
+var ag=new THREE.BufferGeometry().setFromPoints(ap);
+var am=new THREE.LineDashedMaterial({color:0x2a2a4a,transparent:true,opacity:.3,dashSize:.03,gapSize:.02});
+var al=new THREE.Line(ag,am);al.computeLineDistances();M.add(al);
+var tm=new THREE.MeshBasicMaterial({color:0x2a2a4a,transparent:true,opacity:.5});
+[[.3,.85],[.355,.02]].forEach(function(p){var t=new THREE.Mesh(new THREE.SphereGeometry(.008,8,8),tm);t.position.set(p[0],p[1],0);M.add(t);});
+var fg=new THREE.CircleGeometry(.8,32);var fm=new THREE.MeshBasicMaterial({color:0xc0c4cc,transparent:true,opacity:.15});
+var flo=new THREE.Mesh(fg,fm);flo.rotation.x=-Math.PI/2;flo.position.y=-.88;M.add(flo);
+
+var anch={arm:new THREE.Vector3(.42,.45,0),chest:new THREE.Vector3(-.32,.78,0),waist:new THREE.Vector3(-.26,.4,0)};
+var drag=false,px=0,rv=0,tr=0,cr=0;
+ct.addEventListener('pointerdown',function(e){drag=true;px=e.clientX;rv=0;});
+ct.addEventListener('pointermove',function(e){if(!drag)return;var d=e.clientX-px;rv=d*.008;tr+=rv;px=e.clientX;});
+ct.addEventListener('pointerup',function(){drag=false;});
+ct.addEventListener('pointerleave',function(){drag=false;});
+ct.addEventListener('touchstart',function(e){drag=true;px=e.touches[0].clientX;rv=0;},{passive:true});
+ct.addEventListener('touchmove',function(e){if(!drag)return;var d=e.touches[0].clientX-px;rv=d*.008;tr+=rv;px=e.touches[0].clientX;},{passive:true});
+ct.addEventListener('touchend',function(){drag=false;});
+
+function ts(p){var v=p.clone();v.project(cam);return{x:(v.x*.5+.5)*ct.clientWidth,y:(-v.y*.5+.5)*ct.clientHeight};}
+var la=document.getElementById('la'),lc=document.getElementById('lc'),lw=document.getElementById('lw');
+function uL(){
+M.updateMatrixWorld();
+var a={};Object.keys(anch).forEach(function(k){a[k]=anch[k].clone().applyMatrix4(M.matrixWorld);});
+var sa=ts(a.arm),sc2=ts(a.chest),sw=ts(a.waist);
+la.style.left=(sa.x-10)+'px';la.style.top=(sa.y-15)+'px';
+lc.style.left=(sc2.x-60)+'px';lc.style.top=(sc2.y-15)+'px';
+lw.style.left=(sw.x-55)+'px';lw.style.top=(sw.y-15)+'px';
+var fw=new THREE.Vector3(0,0,1).applyQuaternion(M.quaternion);
+var rd=new THREE.Vector3(1,0,0).applyQuaternion(M.quaternion);
+var ld=new THREE.Vector3(-1,0,0).applyQuaternion(M.quaternion);
+var cd=new THREE.Vector3(0,0,1);
+la.style.opacity=Math.pow(Math.max(0,-rd.dot(cd)),.6)*.95;
+var fv=Math.max(0,fw.dot(cd)),sv=Math.abs(ld.dot(cd)),bv=Math.max(fv,sv*.6);
+lc.style.opacity=Math.pow(bv,.8)*.9;
+lw.style.opacity=Math.pow(bv,.8)*.9;
+}
+function anim(){
+requestAnimationFrame(anim);
+if(!drag){tr+=.003;rv*=.95;tr+=rv;}
+cr+=(tr-cr)*.08;M.rotation.y=cr;
+M.position.y=-.15+Math.sin(Date.now()*.001)*.003;
+uL();ren.render(scene,cam);
+}
+anim();
+window.addEventListener('resize',function(){cam.aspect=ct.clientWidth/ct.clientHeight;cam.updateProjectionMatrix();ren.setSize(ct.clientWidth,ct.clientHeight);});
+})();
+</script>
+</body>
+</html>
